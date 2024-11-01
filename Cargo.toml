@@ -1,0 +1,13 @@
+[package]
+name = "bevy_asset_tar"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+bevy = { version = "0.14.2", default-features = false, features = ["bevy_asset"] }
+flate2 = "1.0.34"
+futures-util = "0.3.31"
+log = "0.4"
+tar = "0.4.42"
+
