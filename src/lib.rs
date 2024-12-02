@@ -9,7 +9,6 @@ use bevy::{
         Reader, VecReader,
     },
     prelude::*,
-    tasks::futures_lite::AsyncReadExt,
 };
 use futures_util::lock::{MappedMutexGuard, Mutex, MutexGuard};
 
@@ -61,26 +60,26 @@ impl TarAssetReader {
 }
 
 impl AssetReader for TarAssetReader {
-    async fn read<'a>(&'a self, path: &'a Path) -> Result<Box<Reader<'a>>, AssetReaderError> {
+    async fn read<'a>(&'a self, path: &'a Path) -> Result<impl Reader + 'a, AssetReaderError> {
         let archive = self.load().await?;
-        Ok(Box::new(VecReader::new(
+        Ok(VecReader::new(
             archive
                 .read_file(path)
                 .map_err(|e| to_asset_reader_err(e, path))?,
-        )))
+        ))
     }
 
-    async fn read_meta<'a>(&'a self, path: &'a Path) -> Result<Box<Reader<'a>>, AssetReaderError> {
+    async fn read_meta<'a>(&'a self, path: &'a Path) -> Result<impl Reader + 'a, AssetReaderError> {
         let archive = self.load().await?;
         let mut meta_path = path.to_owned();
         let mut extension = path.extension().unwrap_or_default().to_os_string();
         extension.push(".meta");
         meta_path.set_extension(extension);
-        Ok(Box::new(VecReader::new(
+        Ok(VecReader::new(
             archive
                 .read_file(&meta_path)
                 .map_err(|e| to_asset_reader_err(e, &meta_path))?,
-        )))
+        ))
     }
 
     async fn read_directory<'a>(
