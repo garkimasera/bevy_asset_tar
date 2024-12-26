@@ -2,6 +2,41 @@ use std::collections::{HashMap, HashSet};
 use std::io::{Cursor, Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ArchiveFileKind {
+    Tar,
+    TarGz,
+}
+
+#[derive(Clone, Debug)]
+pub struct ArchiveFileExtensionList(pub(crate) HashMap<String, ArchiveFileKind>);
+
+impl Default for ArchiveFileExtensionList {
+    fn default() -> Self {
+        let mut list = HashMap::default();
+        list.insert(".tar".into(), ArchiveFileKind::Tar);
+        list.insert(".tar.gz".into(), ArchiveFileKind::TarGz);
+        list.insert(".tgz".into(), ArchiveFileKind::TarGz);
+        Self(list)
+    }
+}
+
+impl ArchiveFileExtensionList {
+    pub fn from_path(&self, path: &std::path::Path) -> Option<ArchiveFileKind> {
+        self.0.iter().find_map(|(ext, kind)| {
+            if let Some(file) = path.to_str() {
+                if file.ends_with(ext) {
+                    Some(*kind)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+    }
+}
+
 #[derive(Debug)]
 pub struct Archive {
     files: HashMap<PathBuf, Vec<u8>>,
@@ -9,11 +44,22 @@ pub struct Archive {
 }
 
 impl Archive {
-    pub fn new(input: Vec<u8>) -> Result<Self, Error> {
-        let mut tar = tar::Archive::new(Cursor::new(input));
+    pub fn new() -> Self {
+        Self {
+            files: HashMap::default(),
+            dirs: HashSet::default(),
+        }
+    }
 
-        let mut files = HashMap::default();
-        let mut dirs = HashSet::default();
+    pub fn append(&mut self, kind: ArchiveFileKind, input: Vec<u8>) -> Result<(), Error> {
+        match kind {
+            ArchiveFileKind::Tar => self.read_tar(input),
+            ArchiveFileKind::TarGz => self.read_tar_gz(input),
+        }
+    }
+
+    fn read_tar(&mut self, input: Vec<u8>) -> Result<(), Error> {
+        let mut tar = tar::Archive::new(Cursor::new(input));
 
         for entry in tar.entries()? {
             let mut entry = entry?;
@@ -31,10 +77,15 @@ impl Archive {
                 tar::EntryType::Regular => {
                     let mut file = Vec::new();
                     entry.read_to_end(&mut file)?;
-                    files.insert(path, file);
+                    if self.files.insert(path, file).is_some() {
+                        log::info!(
+                            "overwrite \"{}\"",
+                            String::from_utf8_lossy(&entry.path_bytes())
+                        );
+                    }
                 }
                 tar::EntryType::Directory => {
-                    dirs.insert(path);
+                    self.dirs.insert(path);
                 }
                 t => {
                     return Err(Error::new(
@@ -45,7 +96,7 @@ impl Archive {
             }
         }
 
-        Ok(Self { files, dirs })
+        Ok(())
     }
 
     pub fn read_file(&self, path: &Path) -> Result<Vec<u8>, Error> {
@@ -95,11 +146,11 @@ impl Archive {
         }
     }
 
-    pub fn from_gz(input: Vec<u8>) -> Result<Self, Error> {
+    fn read_tar_gz(&mut self, input: Vec<u8>) -> Result<(), Error> {
         let mut decoded = Vec::new();
         let mut gz = flate2::read::GzDecoder::new(Cursor::new(input));
         gz.read_to_end(&mut decoded)?;
-        Self::new(decoded)
+        self.read_tar(decoded)
     }
 }
 
