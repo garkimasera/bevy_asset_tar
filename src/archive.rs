@@ -88,10 +88,7 @@ impl Archive {
                     self.dirs.insert(path);
                 }
                 t => {
-                    return Err(Error::new(
-                        ErrorKind::Other,
-                        format!("Unexpected file type in tar {:?}", t),
-                    ));
+                    return Err(Error::other(format!("Unexpected file type in tar {:?}", t)));
                 }
             }
         }
@@ -109,27 +106,27 @@ impl Archive {
 
     pub fn read_dir(&self, path: &Path) -> Result<Dir, Error> {
         if !self.is_dir(path)? {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!("{} is not a directory", path.display()),
-            ));
+            return Err(Error::other(format!(
+                "{} is not a directory",
+                path.display()
+            )));
         }
 
         let mut files = Vec::new();
 
         for p in self.files.keys() {
-            if let Some(parent) = p.parent() {
-                if parent == path {
-                    files.push(p.to_owned())
-                }
+            if let Some(parent) = p.parent()
+                && parent == path
+            {
+                files.push(p.to_owned())
             }
         }
 
         for p in &self.dirs {
-            if let Some(parent) = p.parent() {
-                if parent == path {
-                    files.push(p.to_owned())
-                }
+            if let Some(parent) = p.parent()
+                && parent == path
+            {
+                files.push(p.to_owned())
             }
         }
 
