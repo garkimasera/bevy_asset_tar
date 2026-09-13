@@ -9,8 +9,8 @@ use std::{
 use archive::Archive;
 use bevy::{
     asset::io::{
-        AssetReader, AssetReaderError, AssetSource, AssetSourceId, ErasedAssetReader, PathStream,
-        Reader, VecReader,
+        AssetReader, AssetReaderError, AssetSource, AssetSourceBuilder, AssetSourceId,
+        ErasedAssetReader, PathStream, Reader, VecReader,
     },
     prelude::*,
 };
@@ -43,7 +43,7 @@ impl Plugin for AssetTarPlugin {
 
         app.register_asset_source(
             AssetSourceId::Default,
-            AssetSource::build().with_reader(move || {
+            AssetSourceBuilder::new(move || {
                 Box::new(TarAssetReader {
                     archive_files: archive_files.clone(),
                     archive_file_extension_list: archive_file_extension_list.clone(),
